@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OFM 模型选择器 · 测一下再决定加进 DSH</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#fff; --line:#e3e6ea; --line2:#eef1f4;
+    --ink:#1b1f24; --ink2:#5a6472; --ink3:#8a94a2;
+    --ok:#12805c; --okbg:#e6f5ef; --warn:#8a6100; --warnbg:#fdf3dd;
+    --bad:#b3261e; --badbg:#fceceb; --free:#0b6bcb; --freebg:#e7f1fd;
+    --accent:#1b4f9c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{background:#fff;border-bottom:1px solid var(--line);padding:12px 20px;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:20}
+  header h1{font-size:16px;margin:0;font-weight:650}
+  header .sub{color:var(--ink3);font-size:12px}
+  .grow{flex:1}
+  .pill{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--line2);color:var(--ink2);white-space:nowrap}
+  main{padding:16px 20px 60px;max-width:1500px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:14px}
+  .card > h2{margin:0;padding:11px 15px;font-size:14px;font-weight:650;
+    border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .card > .body{padding:13px 15px}
+  button{font:inherit;padding:6px 12px;border:1px solid var(--line);background:#fff;
+    color:var(--ink);border-radius:7px;cursor:pointer;transition:.12s}
+  button:hover{border-color:#c3cad3;background:#fafbfc}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:hover{background:#16407e}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.mini{padding:3px 9px;font-size:12px}
+  input[type=text],input[type=number],select{font:inherit;padding:6px 9px;border:1px solid var(--line);
+    border-radius:7px;background:#fff;color:var(--ink)}
+  input[type=text].bad{border-color:var(--bad)}
+  .toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:6px 9px;text-align:left;border-bottom:1px solid var(--line2);vertical-align:middle}
+  th{font-weight:600;color:var(--ink2);background:#fafbfc;font-size:12px;position:sticky;top:0}
+  tbody tr:hover{background:#fafcff}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .wrap{max-height:460px;overflow:auto;border-top:1px solid var(--line2)}
+  code{font-family:"Cascadia Mono",Consolas,monospace;font-size:12.5px}
+  .badge{font-size:11.5px;padding:2px 7px;border-radius:5px;font-weight:600;white-space:nowrap}
+  .b-free{background:var(--freebg);color:var(--free)}
+  .b-credit{background:var(--warnbg);color:var(--warn)}
+  .b-unknown{background:var(--line2);color:var(--ink3)}
+  .b-ok{background:var(--okbg);color:var(--ok)}
+  .b-slow{background:var(--warnbg);color:var(--warn)}
+  .b-bad{background:var(--badbg);color:var(--bad)}
+  .b-lane{background:#eef4ff;color:#1b4f9c;border:1px solid #cfe0fb}
+  .bar{height:6px;border-radius:3px;background:#e9edf2;overflow:hidden;min-width:60px}
+  .bar > i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+  .bar.bad > i{background:var(--bad)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:11px}
+  .kpi{border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#fff}
+  .kpi .k{font-size:11.5px;color:var(--ink3);margin-bottom:2px}
+  .kpi .v{font-size:19px;font-weight:660;font-variant-numeric:tabular-nums}
+  .kpi .v small{font-size:12px;font-weight:400;color:var(--ink2)}
+  .muted{color:var(--ink3)}
+  .empty{color:var(--ink3);padding:20px;text-align:center}
+  .prog{font-size:12px;color:var(--ink2)}
+  .log{font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;color:var(--ink2);
+    max-height:120px;overflow:auto;background:#fafbfc;border:1px solid var(--line2);
+    border-radius:7px;padding:8px 10px;white-space:pre-wrap}
+  .note{font-size:12px;color:var(--ink3);margin-top:7px;line-height:1.6}
+  .flex{display:flex;gap:7px;align-items:center}
+  .tr-sel{width:32px}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
+  .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.slow{background:#d08a00}
+  .dot.none{background:#c3cad3}
+
+  /* ── 穿梭框 ── */
+  .shuttle{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px}
+  @media (max-width:1100px){ .shuttle{grid-template-columns:1fr} }
+  .pane{border:1px solid var(--line);border-radius:10px;background:#fff;display:flex;flex-direction:column;min-width:0}
+  .pane-head{padding:9px 12px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:8px;font-size:13px}
+  .pane-filters{padding:8px 12px;border-bottom:1px solid var(--line2);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .pane-filters input[type=text]{flex:1 1 140px;min-width:120px;font-size:12px;padding:4px 7px}
+  .pane-filters select{font-size:12px;padding:4px 6px}
+  .pane .wrap{max-height:520px;border-top:0}
+  .pane tbody tr{cursor:pointer}
+  .pane tbody tr:hover{background:#eef4ff}
+
+  /* ── 视觉编码：渠道角标 / 模型族色条 / EAC 标记 ── */
+  .cell-id{position:relative;padding-left:6px !important;padding-top:6px !important;padding-bottom:9px !important}
+  /* 底部色条：按模型族上色，用 id 文本色不易分辨，故加一条 3px 实底 */
+  .cell-id.fam{box-shadow:inset 0 -3px 0 0 var(--fam,#c3cad3)}
+  /* 渠道角标：右上角小方块，hover 显示渠道全名 */
+  .chan-tag{position:absolute;top:2px;right:4px;font-size:9.5px;line-height:1;
+    padding:2px 4px;border-radius:3px;font-weight:700;letter-spacing:.2px;
+    background:var(--chan,#8a94a2);color:#fff;pointer-events:none}
+  /* EAC 协付车道：左侧竖线 + 斜纹背景 */
+  .cell-id.eac{box-shadow:inset 3px 0 0 0 #7c5cff, inset 0 -3px 0 0 var(--fam,#c3cad3);
+    background:repeating-linear-gradient(135deg,#f6f2ff 0 6px,#fbf9ff 6px 12px)}
+  .eac-mark{position:absolute;left:5px;top:6px;font-size:9px;font-weight:800;color:#7c5cff;
+    letter-spacing:.3px;pointer-events:none}
+  .cell-id.eac .idtxt{padding-left:26px}
+  details{margin-top:8px}
+  details summary{cursor:pointer;font-size:12px;color:var(--ink2);user-select:none}
+  details pre{background:#fafbfc;border:1px solid var(--line2);border-radius:7px;padding:9px 11px;
+    font-family:"Cascadia Mono",Consolas,monospace;font-size:11.5px;overflow:auto;max-height:300px}
+</style>
+</head>
+<body>
+<header>
+  <h1>OFM 模型选择器</h1>
+  <span class="sub" id="hdr-sub">先测试，再决定加进 DSH</span>
+  <span class="grow"></span>
+  <span class="pill" id="hdr-status">未连接</span>
+  <span class="pill" id="hdr-count">0 个模型</span>
+</header>
+
+<main>
+
+<div class="card">
+  <h2>① 连接</h2>
+  <div class="body">
+    <div class="toolbar" style="margin-bottom:9px">
+      <span class="muted">端点</span>
+      <input type="text" id="in-base" value="http://127.0.0.1:18900/v1" style="min-width:260px">
+      <span class="muted">API Key</span>
+      <input type="text" id="in-key" placeholder="粘贴 OFM 的 forwardKey" style="min-width:300px">
+      <button class="primary" id="btn-connect" onclick="doConnect()">连接并拉取清单</button>
+    </div>
+    <div class="note">
+      Key 只存在你自己浏览器的 localStorage 里，不会发到任何第三方。可在
+      <code>%USERPROFILE%\.our-free-model\settings.json</code> 里找 <code>forwardKey</code>，
+      或打开 OFM 桌面端 → 设置 → 本地网关里查看。填过就会记住，下次打开不用再填。
+      <br>
+      <b>测出来的结果只代表此刻这一条链路</b>。免费模型的稳定性波动很大
+      （实测遇到过同一条模型几分钟前失败、几分钟后就通了），所以别用一次结论下判断，
+      写进 DSH 前建议再测一次。
+    </div>
+    <div class="log" id="log" style="margin-top:9px">等待连接…</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>② 模型穿梭 · 测试 · 写入 DSH
+    <span class="grow"></span>
+    <span class="prog" id="dsh-rec-count"></span>
+  </h2>
+  <div class="body">
+    <div class="toolbar" style="margin-bottom:10px">
+      <button id="btn-sweep-all" onclick="sweep('all')">测试全部</button>
+      <button id="btn-sweep-free" onclick="sweep('free')">只测免费</button>
+      <button id="btn-sweep-dsh" onclick="sweep('dsh')">只测右侧（配置里的）</button>
+      <button class="mini" id="btn-sweep-leftsel" onclick="sweep('leftsel')">测左侧勾选的</button>
+      <button class="mini" id="btn-sweep-rightsel" onclick="sweep('rightsel')">测右侧勾选的</button>
+      <button class="mini" id="btn-stop" onclick="stopSweep()" disabled>停止</button>
+      <label class="muted flex" style="font-size:12px">
+        <input type="checkbox" id="opt-deep"> 深度复核
+      </label>
+      <label class="muted flex" style="font-size:12px">
+        超时<input type="number" id="opt-timeout" value="15" min="3" max="600" style="width:56px">秒
+      </label>
+      <span class="grow"></span>
+      <button class="mini" id="btn-add-all-ok" onclick="addAllOk()">把所有连通的加入配置</button>
+      <button class="primary" id="btn-apply" onclick="applyChanges()">应用到 DSH 配置</button>
+    </div>
+    <div class="toolbar" style="margin-bottom:9px">
+      <span class="muted" style="font-size:12px">配置文件</span>
+      <select id="in-profile" onchange="onProfileChange()" style="min-width:130px;font-size:12px">
+        <option value="web">web  profile</option>
+        <option value="desktop">desktop  profile</option>
+        <option value="headless">headless  profile</option>
+        <option value="headless_ofm">headless_ofm</option>
+        <option value="headless_ofm_ns">headless_ofm_ns</option>
+        <option value="__custom">自定义路径…</option>
+      </select>
+      <input type="text" id="in-profile-path" placeholder="或直接填 cordis.patch.yml 绝对路径"
+             style="min-width:300px;display:none;font-size:12px" oninput="onProfilePathInput()">
+      <button class="mini" id="btn-open" onclick="pickFile()">手动选择文件</button>
+      <span class="prog" id="cfg-path-hint"></span>
+    </div>
+    <div class="note" style="margin-top:0">
+      <b>左边是全部模型，右边是 DSH 配置里的模型。</b>
+      点左边某行 = 把它加进配置；点右边某行 = 从配置移除。两边都支持多选与筛选。
+      <br>配置文件一般在 <code>%USERPROFILE%\.dsh\profiles\&lt;profile&gt;\cordis.patch.yml</code>，
+      <b>换机器/换用户路径会变</b> —— 上面可选 profile、填绝对路径，或点「手动选择文件」选一次（之后会记住）。
+      测速台服务在跑时自动直连、全程免选。
+      「应用」按钮统一落盘（含自动备份），<b>不点就不会动文件</b> —— 右侧就是最终清单，不存在写少的问题。
+    </div>
+    <div class="log" id="log2" style="margin-top:8px">等待开始…</div>
+    <div class="log" id="log3" style="margin-top:6px">连接中…</div>
+
+    <div class="shuttle">
+      <div class="pane">
+        <div class="pane-head">
+          <b>全部模型</b>
+          <span class="muted" id="left-count"></span>
+          <span class="grow"></span>
+          <button class="mini" onclick="shuttleMove('right')">加入右侧 →</button>
+        </div>
+        <div class="pane-filters">
+          <input type="text" id="f-text" placeholder="搜索模型 id…" oninput="renderList()">
+          <select id="f-channel" onchange="renderList()"><option value="">全部渠道</option></select>
+          <select id="f-cost" onchange="renderList()">
+            <option value="">全部计费</option>
+            <option value="free">免费</option>
+            <option value="credit">积分</option>
+            <option value="unknown">未知</option>
+          </select>
+          <select id="f-state" onchange="renderList()">
+            <option value="">全部状态</option>
+            <option value="ok">仅连通</option>
+            <option value="bad">仅失败</option>
+            <option value="untested">仅未测</option>
+          </select>
+        </div>
+        <div class="wrap">
+          <table>
+            <thead><tr>
+              <th class="tr-sel"><input type="checkbox" id="sel-all-left" onclick="toggleAllPane('left', this)"></th>
+              <th>模型 id</th><th>名称</th><th>计费</th><th>思考</th>
+              <th>测试</th><th class="num">耗时</th><th>备注</th>
+            </tr></thead>
+            <tbody id="list-left"><tr><td colspan="8" class="empty">连接后这里会出现模型清单</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="pane">
+        <div class="pane-head">
+          <b>DSH 配置里的模型</b>
+          <span class="muted" id="right-count"></span>
+          <span class="grow"></span>
+          <button class="mini" onclick="shuttleMove('left')">← 移出到左侧</button>
+        </div>
+        <div class="pane-filters">
+          <input type="text" id="r-text" placeholder="搜索…" oninput="renderRight()">
+          <select id="r-cost" onchange="renderRight()">
+            <option value="">全部计费</option>
+            <option value="free">免费</option>
+            <option value="credit">积分</option>
+            <option value="unknown">未知</option>
+          </select>
+          <span class="muted" id="right-pending"></span>
+        </div>
+        <div class="wrap">
+          <table>
+            <thead><tr>
+              <th class="tr-sel"><input type="checkbox" id="sel-all-right" onclick="toggleAllPane('right', this)"></th>
+              <th>模型 id</th><th>名称</th><th>计费</th><th>思考</th>
+              <th>测试</th><th class="num">耗时</th><th>备注</th>
+            </tr></thead>
+            <tbody id="list-right"><tr><td colspan="8" class="empty">读取中…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>③ 协议与工具调用测试
+    <span class="grow"></span>
+    <span class="prog" id="proto-count"></span>
+  </h2>
+  <div class="body">
+    <div class="toolbar" style="margin-bottom:9px">
+      <button class="primary" id="btn-proto" onclick="testProtocols()">测试协议 + 工具调用</button>
+      <span class="muted" style="font-size:12px">用当前勾选的第一个模型，或下面指定</span>
+      <input type="text" id="in-proto-model" placeholder="留空则用勾选项第一个" style="min-width:260px" oninput="protoHint()">
+      <span class="prog" id="proto-hint"></span>
+    </div>
+    <div class="note">
+      测三件事：<b>① 三种协议能不能通</b>（responses / chat completions / anthropic messages）·
+      <b>② 模型会不会发起工具调用</b>（给一个 <code>get_weather</code> 工具，看它调不调）·
+      <b>③ 工具结果能不能回传</b>（把假结果喂回去，看它答不答得上来）。
+      第 ③ 项是 DSH agent 能不能干活的根本 —— 只会调工具、不会用结果，等于残废。
+      <br>
+      DSH 的 ofm 用的是 <code>openai-responses</code>。另两种协议在 OFM 上通常也通，
+      但换成它们会丢掉 responses 独有的能力（尤其是 <code>reasoningEfforts</code> 思考等级），
+      所以换协议前先看第 ② ③ 项在新协议下是否同样通过。
+    </div>
+    <div class="log" id="log4" style="margin-top:9px">等待测试…</div>
+    <div class="wrap" style="margin-top:10px">
+      <table>
+        <thead><tr>
+          <th>协议</th><th>连通</th><th>发起工具</th><th>用上工具结果</th>
+          <th class="num">耗时</th><th>说明</th>
+        </tr></thead>
+        <tbody id="proto-list"><tr><td colspan="6" class="empty">测试后这里会出现对比表</td></tr></tbody>
+      </table>
+    </div>
+    <details>
+      <summary>为什么三种协议的返回形状不一样（点开看实测报文）</summary>
+      <pre id="proto-raw">测试后这里会显示各协议的原始返回。</pre>
+    </details>
+  </div>
+</div>
+
+</main>
+
+<script>
+"use strict";
+// ═══════════════════ 状态 ═══════════════════
+let MODELS = [];        // /v1/models 的全量结果 + 解析出的费率/思考等级
+let RESULTS = {};       // id -> 最近一次测试结果
+let DSH_RECORDS = [];   // 配置文件里已有的 ofm 模型 [{id,name}]
+let RUNNING = false;
+let ABORT = null;
+let DSH_HANDLE = null;  // File System Access API 的句柄（持久化在 IndexedDB）
+let USE_FILE_ONLY = false;  // 用户显式选过文件 → 忽略服务端，只用这个句柄
+
+const LS_KEY = 'ofm-picker-key', LS_BASE = 'ofm-picker-base';
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtMs = v => (v === null || v === undefined || isNaN(v)) ? '–' : Number(v).toLocaleString() + ' ms';
+const KIND_LABEL = {ok:'连通', reason_only:'仅思考', timeout:'超时', empty:'空响应',
+  cred_expired:'凭证失效', account_tier:'账号类型', eol:'已下线',
+  region:'地区受限', throttled:'限流', error:'失败'};
+const KIND_CLASS = {ok:'b-ok', reason_only:'b-slow', timeout:'b-bad', empty:'b-bad',
+  cred_expired:'b-bad', account_tier:'b-bad', eol:'b-bad',
+  region:'b-bad', throttled:'b-slow', error:'b-bad'};
+const PI_LEVELS = ['off','minimal','low','medium','high','xhigh','max'];
+
+function log(el, line){
+  const e = $(el); e.textContent += '\n' + line; e.scrollTop = e.scrollHeight;
+}
+
+// ═══════════════════ 连接 ═══════════════════
+function base(){ return ($('#in-base').value || '').replace(/\/+$/,''); }
+function key(){ return $('#in-key').value.trim(); }
+
+// ═══════════════════ 配置文件定位（可换机器用） ═══════════════════
+// 不同机器/用户的 ~/.dsh 位置不同，profile 也可能不叫 web。所以：
+//   - 服务直连模式：用服务端自己的路径（最省事，但路径固定为服务端那台机器的 web profile）
+//   - 手动模式：用户选 profile / 填绝对路径 / 选一次文件，三者等价
+const LS_PROFILE = 'ofm-picker-profile', LS_PROFILE_PATH = 'ofm-picker-profile-path';
+const PROFILES = ['web','desktop','headless','headless_ofm','headless_ofm_ns'];
+
+function guessDshHome(){
+  // 浏览器拿不到 %USERPROFILE%，只能靠用户在路径框里填；这里给一个提示用的猜测值。
+  return '';
+}
+function profilePath(p){
+  // 只用于「填绝对路径」模式下的占位提示，不猜测用户目录
+  return p;
+}
+function onProfileChange(){
+  const v = $('#in-profile').value;
+  const box = $('#in-profile-path');
+  if (v === '__custom'){
+    box.style.display = '';
+    box.focus();
+  } else {
+    box.style.display = 'none';
+  }
+  localStorage.setItem(LS_PROFILE, v);
+  updateCfgHint();
+}
+function onProfilePathInput(){
+  localStorage.setItem(LS_PROFILE_PATH, $('#in-profile-path').value.trim());
+  updateCfgHint();
+}
+function updateCfgHint(){
+  const el = $('#cfg-path-hint');
+  if (!el) return;
+  if (SERVER_BASE){
+    el.textContent = `服务直连中（${SERVER_BASE}）→ 服务端固定路径，忽略本处设置`;
+    return;
+  }
+  const p = $('#in-profile').value;
+  const custom = $('#in-profile-path').value.trim();
+  if (custom) el.textContent = `将写入：${custom}`;
+  else if (p === '__custom') el.textContent = '请填绝对路径';
+  else el.textContent = `将写入：~/.dsh/profiles/${p}/cordis.patch.yml`;
+}
+
+// ═══════════════════ 服务直连（零选择） ═══════════════════
+// 浏览器安全模型要求 File System Access 必须有一次用户手势，纯双击的 HTML
+// 无法凭路径直接读写文件（fetch file:// 实测被 CORS 拦）。唯一能完全免选的通道
+// 是本机测速台服务（dsh-model-lab，start-model-lab.ps1 启动）：它有
+// /api/dsh/models 与 /api/dsh/save，且对页面开放 CORS。服务在跑就直连；
+// 没跑才退回文件句柄方式（首次选一次，之后自动记住）。
+let SERVER_BASE = null;
+const LAB_PORTS = [8765, 8766, 8800, 8811, 8877];
+
+async function detectLabServer(){
+  // 用户已显式锁定手动文件时，不再探测服务 —— 他要的就是自己指定的那个路径
+  if (USE_FILE_ONLY){ SERVER_BASE = null; return null; }
+  for (const p of LAB_PORTS){
+    try {
+      const r = await fetch(`http://127.0.0.1:${p}/api/dsh/models`);
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j && Array.isArray(j.models)){
+        SERVER_BASE = `http://127.0.0.1:${p}`;
+        return SERVER_BASE;
+      }
+    } catch(e){ /* 端口没人听，继续试下一个 */ }
+  }
+  SERVER_BASE = null;
+  return null;
+}
+
+// ═══════════════════ 视觉编码 ═══════════════════
+// 渠道角标：一个渠道一个色（右上角小方块），同渠道一眼可辨
+const CHAN_COLOR = {
+  'buddy':'#1b4f9c', 'workbuddy':'#0b6bcb', 'qoder':'#8a6100', 'qodercn':'#a87400',
+  'lobsterai':'#b3261e', 'loomy':'#12805c', 'z-ai':'#7c5cff', 'codearts':'#5a6472',
+  'trae':'#8a94a2', 'minimax':'#d08a00', 'moonshotai':'#0f9d58', 'deepseek-ai':'#16407e',
+  'opencode':'#39b8c4', 'openai':'#5b6b7d', 'raccoon':'#8b7bf0', 'zcode':'#d9743e',
+  'gemini':'#e36aa6', 'cline':'#3ecfa0', 'qwen':'#7bb24a'
+};
+const CHAN_FALLBACK = ['#1b4f9c','#12805c','#b3261e','#8a6100','#7c5cff','#0f9d58',
+                       '#d08a00','#39b8c4','#e36aa6','#d9743e'];
+function chanColor(ch){
+  if (!ch) return '#8a94a2';
+  if (CHAN_COLOR[ch]) return CHAN_COLOR[ch];
+  // 未知渠道按名字散列，保证同色稳定
+  let h = 0; for (let i=0;i<ch.length;i++) h = (h*31 + ch.charCodeAt(i)) >>> 0;
+  return CHAN_FALLBACK[h % CHAN_FALLBACK.length];
+}
+function chanTag(ch){
+  if (!ch) return '';
+  return `<span class="chan-tag" style="--chan:${chanColor(ch)}" title="渠道：${esc(ch)}">${esc(ch.slice(0,10))}</span>`;
+}
+
+// 模型族色条：按「型号族」上色（GLM-5.3 一族同色、DeepSeek V4 一族同色）
+const FAM_COLOR = {
+  'glm-5.3':'#1b4f9c', 'glm-5.3-flash':'#0b6bcb', 'glm-5.2':'#16407e', 'glm-5.1':'#1b4f9c',
+  'deepseek-v4.1-flash':'#12805c', 'deepseek-v4-flash':'#0f9d58', 'deepseek-v4-pro':'#0b7a52',
+  'kimi-k3':'#b3261e', 'kimi-k2.8-preview':'#d08a00', 'kimi-k2.7':'#e36aa6', 'kimi-k2.6':'#8b7bf0',
+  'qwen3.8-max':'#8a6100', 'qwen3.8-flash':'#a87400', 'step-5-preview':'#7c5cff',
+  'hy3':'#39b8c4', 'minimax-m3':'#d9743e', 'spark-x2.5':'#7bb24a'
+};
+const FAM_FALLBACK = ['#1b4f9c','#12805c','#b3261e','#8a6100','#7c5cff','#0f9d58',
+                      '#d08a00','#39b8c4','#e36aa6','#5a6472','#7bb24a','#d9743e'];
+function famColor(fam){
+  if (!fam) return '#c3cad3';
+  if (FAM_COLOR[fam]) return FAM_COLOR[fam];
+  let h = 0; for (let i=0;i<fam.length;i++) h = (h*31 + fam.charCodeAt(i)) >>> 0;
+  return FAM_FALLBACK[h % FAM_FALLBACK.length];
+}
+
+// EAC 协付车道：插件 catalog.json 的 sealIds 一共 8 条，静态列在这里。
+// 走的是 EAC 协付（不计本机额度），与普通免费/积分模型区分开。
+const EAC_IDS = new Set([
+  'z-ai/glm-5.3', 'openai/gpt-oss-20b', 'z-ai/glm-5.3-flash',
+  'opencode/glm-5.3-flash-free', 'deepseek-ai/deepseek-v4.1-flash',
+  'moonshotai/kimi-k2.6', 'opencode/deepseek-v4.1-flash-free', 'moonshotai/kimi-k3'
+]);
+function isEac(id){ return EAC_IDS.has(id); }
+
+// 一行的 id 单元格：渠道角标 + 模型族色条 + EAC 标记
+function idCell(m){
+  const fam = modelFamily(m.name);
+  const eac = isEac(m.id);
+  return `<td class="cell-id fam ${eac?'eac':''}" style="--fam:${famColor(fam)}"
+              title="${esc(m.name || '')}${eac ? '\nEAC 协付车道（不计本机额度）' : ''}">
+    ${chanTag(m.channel)}
+    ${eac ? '<span class="eac-mark">EAC</span>' : ''}
+    <span class="idtxt"><code>${esc(m.id)}</code>${m.vision?' <span class="muted" style="font-size:10px">视觉</span>':''}</span>
+  </td>`;
+}
+
+function apiFetch(path, opts={}){
+  const k = key();
+  const headers = Object.assign({
+    'Authorization': 'Bearer ' + k,
+    'Accept': 'application/json'
+  }, opts.headers || {});
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  return fetch(base() + path, Object.assign({}, opts, {headers, signal: opts.signal}))
+    .then(async r => {
+      const text = await r.text();
+      if (r.status !== 200) {
+        let msg = text;
+        try { const j = JSON.parse(text); msg = (j.error && j.error.message) || text; } catch(e){}
+        throw new Error('HTTP ' + r.status + ': ' + String(msg).slice(0, 260));
+      }
+      return text ? JSON.parse(text) : {};
+    });
+}
+
+function doConnect(){
+  localStorage.setItem(LS_BASE, base());
+  localStorage.setItem(LS_KEY, key());
+  $('#log').textContent = '连接中…';
+  $('#btn-connect').disabled = true;
+  apiFetch('/models')
+    .then(d => {
+      const rows = (d.data || []).map(m => ({
+        id: m.id,
+        name: m.name || m.id,
+        channel: m.channel || (m.id.includes('/') ? m.id.split('/')[0] : ''),
+        ctx: m.context_window,
+        maxtok: m.max_tokens,
+        vision: !!m.vision,
+        efforts: ((m.reasoning || {}).efforts || []).map(e => e.id).filter(Boolean),
+        price: parsePrice(m.name)
+      }));
+      MODELS = rows;
+      // 排序：免费优先 → 积分（倍率低的优先）→ 未知费率垫底。
+      // 不按 /v1/models 原顺序展示：那份顺序把大量「未知」排在最前面，
+      // 用户最先看到的全是 codearts/trae 这些连标价都没有的渠道。
+      MODELS.sort((a, b) => {
+        const rank = m => (m.price && m.price.free) ? 0
+                       : ((m.price && m.price.mult !== null) ? 1 : 2);
+        if (rank(a) !== rank(b)) return rank(a) - rank(b);
+        if (rank(a) === 1 && a.price.mult !== b.price.mult) return a.price.mult - b.price.mult;
+        return (a.channel || '').localeCompare(b.channel || '') || a.id.localeCompare(b.id);
+      });
+      // readDshSelection 是 async（要读文件句柄），必须 await。
+      // 之前当成同步 Set 用，`.has` 直接抛 TypeError，把整个连接流程带崩了。
+      return readDshSelection().then(dsh => {
+        MODELS.forEach(m => { m.in_dsh = dsh.has(m.id); });
+        applyFamilyFallback();
+        $('#hdr-status').innerHTML = '<span class="badge b-ok">已连接</span>';
+        $('#hdr-count').textContent = MODELS.length + ' 个模型';
+        if (dsh.size){
+          $('#log').textContent = `清单就绪：${MODELS.length} 个 · DSH 配置里已有 ${dsh.size} 个（已在右侧列出）`;
+        } else {
+          // 读不到 ≠ 配置里没有。可能是服务没跑且句柄没选过，必须说清楚
+          $('#log').textContent = `清单就绪：${MODELS.length} 个。`;
+          log('#log', SERVER_BASE || DSH_HANDLE
+            ? '这份配置里没读到 ofm 模型段，或模型段为空。'
+            : '还没连上配置文件（测速台服务未运行且未选过文件），右侧列表会是空的。');
+        }
+        renderChannelFilter(); renderList();
+      });
+    })
+    .catch(e => {
+      // 区分「连不上端点」和「端点连上了但内容有问题」—— 两者的处置完全不同，
+      // 混在一句「连接失败」里用户不知道该修哪头。
+      const msg = String((e && e.message) || e);
+      let hint = '';
+      if (/Failed to fetch|NetworkError|load failed/i.test(msg)){
+        hint = '\n\n浏览器根本没能发出请求。常见原因：' +
+               '\n  1) OFM 桌面端没启动（托盘里有没有它的图标）' +
+               '\n  2) 端口不对 —— 打开 %USERPROFILE%\\.our-free-model\\settings.json 看 standalonePort' +
+               '\n  3) 浏览器把 http://127.0.0.1 判成了不安全来源，地址栏右侧是否有权限提示';
+      } else if (/HTTP 40[13]|Unauthorized|invalid/i.test(msg)){
+        hint = '\n\n端点通了但 Key 被拒。点「自动取 Key」重新读一次 settings.json。';
+      } else if (/HTTP 5\d\d/.test(msg)){
+        hint = '\n\n端点返回服务端错误，可能是 OFM 内部转发失败，稍后再试。';
+      }
+      $('#hdr-status').innerHTML = '<span class="badge b-bad">连接失败</span>';
+      $('#log').textContent = '连接失败：' + msg + hint;
+    })
+    .finally(() => { $('#btn-connect').disabled = false; });
+}
+
+// 费率写在显示名里：`GLM-5.3 · x0.79` / `Step-5-Preview · x0.00→免费` / `Qwen3.8-Flash · 免费`
+// 解不出倍率的（codearts/trae/minimax 整条渠道不标价）记为 unknown —— 不猜。
+function parsePrice(name){
+  const t = String(name || '');
+  if (t.includes('免费')) return {free:true, mult:0, label:'免费'};
+  const m = t.match(/x\s*([0-9]+(?:\.[0-9]+)?)/);
+  if (m) { const v = parseFloat(m[1]); return {free: v <= 1e-9, mult: v, label: 'x' + v}; }
+  return {free:false, mult:null, label:'未知'};
+}
+
+// OFM 没报思考能力的条目，按「型号族」借同族能力。
+// 例：z-ai/glm-5.3 自己没报，buddy/glm-5.3 报了 low/high/max —— 实测 z-ai 确实接受。
+function modelFamily(name){
+  let t = String(name || '').split('·')[0];
+  t = t.replace(/[（(].*?[）)]/g, '').trim().toLowerCase();
+  if (t.includes('/')) t = t.split('/').pop();
+  return t;
+}
+function applyFamilyFallback(){
+  const byId = {}, votes = {};
+  for (const m of MODELS){
+    const pi = effortsToPi(m.efforts);
+    m.pi_efforts = pi; m.efforts_source = Object.keys(pi).length ? 'self' : '';
+    if (Object.keys(pi).length) (votes[modelFamily(m.name)] = votes[modelFamily(m.name)] || []).push(pi);
+    byId[m.id] = m;
+  }
+  for (const m of MODELS){
+    if (m.pi_efforts && Object.keys(m.pi_efforts).length) continue;
+    const vs = votes[modelFamily(m.name)] || [];
+    if (!vs.length) continue;
+    const tally = {};
+    vs.forEach(v => { const k = Object.keys(v).sort().join(','); tally[k] = (tally[k]||0)+1; });
+    const best = Object.keys(tally).sort((a,b) => (tally[b]-tally[a]) || (b.split(',').length - a.split(',').length))[0];
+    m.pi_efforts = vs.find(v => Object.keys(v).sort().join(',') === best);
+    m.efforts_source = 'family';
+  }
+}
+// OFM 用 none 表示不思考，pi-ai 认 off；其余同名直传
+function effortsToPi(efforts){
+  const out = {};
+  for (const e of (efforts || [])){
+    const k = String(e).trim().toLowerCase();
+    if (k === 'none' || k === 'off') out['off'] = null;
+    else if (PI_LEVELS.includes(k)) out[k] = k;
+  }
+  return Object.keys(out).some(k => k !== 'off') ? out : {};
+}
+
+// ═══════════════════ 测试 ═══════════════════
+// 与 DSH 的 ofm provider 保持同一协议：api: openai-responses → POST /v1/responses
+function testOne(id, deep, timeoutSec, signal){
+  const payload = {
+    model: id,
+    input: [{type:'message', role:'user',
+             content:[{type:'input_text', text:'Say exactly: ok'}]}],
+    stream: false, store: false,
+    max_output_tokens: deep ? 1024 : 64
+  };
+  const started = Date.now();
+  const timer = new Promise((_, rej) =>
+    setTimeout(() => rej(new Error('客户端超时 ' + timeoutSec + 's')), timeoutSec * 1000));
+  return Promise.race([apiFetch('/responses', {method:'POST', body:JSON.stringify(payload), signal}), timer])
+    .then(d => {
+      let texts = [], think = [];
+      for (const item of (d.output || [])){
+        for (const p of (item.content || []))
+          if (['output_text','text'].includes(p.type) && p.text) texts.push(String(p.text));
+        for (const p of (item.summary || [])) if (p.text) think.push(String(p.text));
+        if (item.type === 'reasoning') for (const p of (item.content || [])) if (p.text) think.push(String(p.text));
+      }
+      const content = texts.join(' ').trim();
+      const reasoning = think.join(' ').trim();
+      const incomplete = (d.incomplete_details || {}).reason || '';
+      let status, note = '';
+      if (content) status = 'ok';
+      else if (reasoning) { status = 'reason_only'; note = '只有思考、无正文：输出预算被推理占满，勾「深度复核」重测'; }
+      else { status = 'empty'; note = 'HTTP 200 但既无正文也无思考' + (incomplete ? `（${incomplete}）` : ''); }
+      return {id, status, kind: classify({status, note}), duration_ms: Date.now()-started,
+              content: content.slice(0,200), reasoning: reasoning.slice(0,100), note,
+              tokens: (d.usage || {}).total_tokens, finish: d.status || '', deep};
+    })
+    .catch(e => {
+      if (e && e.name === 'AbortError') return {id, status:'aborted', kind:'aborted', note:'已取消'};
+      const msg = String(e.message || e);
+      const timedOut = /timed out|超时/.test(msg);
+      return {id, status: timedOut ? 'timeout' : 'error', kind: classify({status: timedOut ? 'timeout' : 'error', note: msg}),
+              duration_ms: Date.now()-started, note: msg.slice(0,300)};
+    });
+}
+
+function classify(r){
+  const n = r.note || '', low = n.toLowerCase();
+  if (r.status === 'ok') return 'ok';
+  if (r.status === 'reason_only') return 'reason_only';
+  if (r.status === 'timeout') return 'timeout';
+  if (/refresh/i.test(n) || (n.includes('失效') && /token/i.test(low))) return 'cred_expired';
+  if (low.includes('not allowed for user type')) return 'account_tier';
+  if (/end of life|no longer available/.test(low)) return 'eol';
+  if (/abusive traffic|not available in your country/.test(low)) return 'region';
+  if (n.includes('限流') || low.includes('rate limit') || n.includes('429')) return 'throttled';
+  return 'error';
+}
+
+function sweep(scope){
+  if (RUNNING) return;
+  let ids;
+  if (scope === 'left'){                 // 左侧当前筛选项
+    ids = leftVisible().map(m => m.id);
+  } else if (scope === 'right'){          // 右侧（配置里的）
+    ids = rightVisible().map(m => m.id);
+  } else if (scope === 'free'){           // 只看免费
+    ids = leftVisible().filter(m => m.price && m.price.free).map(m => m.id);
+  } else if (scope === 'leftsel'){        // 左侧勾选的（忽略筛选）
+    ids = [...LEFT_SEL];
+    if (!ids.length){ alert('先在左侧勾选要测的模型'); return; }
+  } else if (scope === 'rightsel'){       // 右侧勾选的（忽略筛选）
+    ids = [...RIGHT_SEL];
+    if (!ids.length){ alert('先在右侧勾选要测的模型'); return; }
+  } else {                                // 全部
+    ids = MODELS.map(m => m.id);
+  }
+  if (!ids.length) { alert('没有可测的模型'); return; }
+  RUNNING = true;
+  ['btn-sweep-all','btn-sweep-free','btn-sweep-dsh','btn-sweep-leftsel','btn-sweep-rightsel']
+    .forEach(i => { const el=$('#'+i); if(el) el.disabled = true; });
+  $('#btn-stop').disabled = false;
+  ABORT = new AbortController();
+  const deep = $('#opt-deep').checked, tmo = $('#opt-timeout').value || 15;
+  const scopeLbl = {all:'全部', free:'免费', left:'左侧筛选', right:'右侧配置',
+                    leftsel:'左侧勾选', rightsel:'右侧勾选'}[scope] || scope;
+  $('#log2').textContent = `开始测试 ${ids.length} 个（${scopeLbl}，${deep?'深度':'标准'}），逐个串行…`;
+  (async () => {
+    let n = 0;
+    for (const id of ids){
+      if (ABORT.signal.aborted) break;
+      const r = await testOne(id, deep, tmo, ABORT.signal);
+      RESULTS[id] = r; n++;
+      const lbl = KIND_LABEL[r.kind] || r.kind;
+      log('#log2', `[${n}/${ids.length}] ${id}  ${lbl}  ${fmtMs(r.duration_ms)}` +
+                 (r.kind !== 'ok' && r.note ? `\n     └─ ${r.note}` : ''));
+      renderList();
+    }
+    const okN = ids.filter(i => RESULTS[i] && RESULTS[i].kind === 'ok').length;
+    log('#log2', `\n完成：${ids.length} 个，连通 ${okN} 个。点「把所有连通的加入配置」可一键搬过去。`);
+    finish();
+  })();
+}
+
+function stopSweep(){ if (ABORT) ABORT.abort(); finish(); }
+function finish(){
+  RUNNING = false;
+  ['btn-sweep-all','btn-sweep-free','btn-sweep-dsh','btn-sweep-leftsel','btn-sweep-rightsel']
+    .forEach(i => { const el=$('#'+i); if(el) el.disabled = false; });
+  $('#btn-stop').disabled = true;
+  renderList();
+}
+
+// ═══════════════════ 列表渲染 ═══════════════════
+function renderChannelFilter(){
+  const set = [...new Set(MODELS.map(m => m.channel).filter(Boolean))].sort();
+  $('#f-channel').innerHTML = '<option value="">全部渠道</option>' +
+    set.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+}
+function costCls(m){ return (m.price && m.price.free) ? 'free' : (m.price && m.price.mult === null ? 'unknown' : 'credit'); }
+function costLbl(m){ return (m.price && m.price.free) ? '免费' : ((m.price && m.price.mult === null) ? '未知' : 'x' + m.price.mult); }
+function effortsBadge(m){
+  const lv = Object.keys(m.pi_efforts || {});
+  if (!lv.length) return '<span class="badge b-unknown" title="写进 DSH 后不会出现思考强度选择器">无</span>';
+  const tag = m.efforts_source === 'family'
+    ? ' <span class="muted" style="font-size:11px" title="OFM 未报该条目的思考能力，按同族模型推断">同族</span>' : '';
+  return `<span class="badge b-lane" title="${esc(lv.join(' / '))}">${esc(lv.join('/'))}</span>${tag}`;
+}
+// 模型名称列：把 OFM 的显示名去掉「 · x0.79 / · 免费」这类价格段，
+// 只留产品名。价格在「计费」列单独显示，这里重复一遍只会更乱。
+//
+// 名字的真实构造（OFM 源码 business.mjs）是 `${model.name} · x${price}`。
+// 实测两条畸形名（本机 OFM 真实返回）：
+//   `Hy3 · x0.05 X`                       → base name 是 `Hy3`，`X` 是倍率后的地区标记
+//   `Deepseek-V4.1-Flash · x0.03 SG`      → base name 无 SG，`SG` 同理
+// 所以价格段可能是「倍率 + 短地区标记」，整段都要剥；剥完首段若自带后缀仍保留。
+// ⚠️ 不能匹配行内任意 `x`+数字：`Spark-X2.5`、`hy3-x` 会被咬成 `Spark-`。
+function modelNameCell(m){
+  let n = String(m.name || m.id || '');
+  if (n.includes('·')){
+    const segs = n.split('·').map(s => s.trim());
+    const kept = segs.filter((s, i) => {
+      if (i === 0) return true;
+      // 纯价格段
+      if (/^(x\s*[0-9]+(?:\.[0-9]+)?\s*(?:→\s*(?:免费|x[0-9.]+))?|免费|限时免费)$/i.test(s)) return false;
+      // 价格 + 变体后缀（如 `x0.03 SG`、`x0.05 X`）：
+      // 价格在前，后面跟的是已在首段出现过的地区/变体词，整段都视为价格尾巴。
+      const pm = s.match(/^(x\s*[0-9]+(?:\.[0-9]+)?)\s+(\S{1,4})$/i);
+      if (pm){
+        // 尾巴是「地区/变体标记」：SG（新加坡）、X 这类短词。它们在价格段里
+        // 跟在倍率后面（`x0.03 SG`），属于价格信息而非产品名，整段都剥掉。
+        // 首段若已自带同名后缀（`Deepseek-V4.1-Flash SG · x0.03 SG`），
+        // 剥掉价格段后首段的后缀仍保留，不会丢信息。
+        return false;
+      }
+      return true;
+    });
+    n = kept.join(' · ').trim();
+  } else {
+    n = n.replace(/\s*x\s*[0-9]+(?:\.[0-9]+)?\s*(?:→\s*(?:免费|x[0-9.]+))?\s*$/i, '');
+  }
+  n = n.replace(/[（(]\s*限时免费\s*[）)]/g, '').trim() || (m.name || m.id);
+  return `<span title="${esc(m.name || '')}">${esc(n)}</span>`;
+}
+
+// ═══════════════════ 穿梭框渲染 ═══════════════════
+// 左侧 = 全部模型（含已在配置里的，用角标/色条区分）
+// 右侧 = 配置里的模型（= 最终清单，点「应用」才落盘）
+// 勾选状态分左右两套：LEFT_SEL / RIGHT_SEL，互不干扰。
+let LEFT_SEL = new Set();
+let RIGHT_SEL = new Set();
+let PENDING = null;   // null = 与配置一致；否则是待写入的 id 数组
+
+function dshIds(){ return PENDING !== null ? PENDING : DSH_RECORDS.map(r => r.id); }
+function pendingDirty(){ return PENDING !== null; }
+
+function leftVisible(){
+  const t = $('#f-text').value.trim().toLowerCase();
+  const ch = $('#f-channel').value, cost = $('#f-cost').value, st = $('#f-state').value;
+  const inDsh = new Set(dshIds());
+  return MODELS.filter(m => {
+    if (ch && m.channel !== ch) return false;
+    if (t && !m.id.toLowerCase().includes(t)) return false;
+    if (cost === 'free' && !(m.price && m.price.free)) return false;
+    if (cost === 'credit' && !(m.price && !m.price.free && m.price.mult !== null)) return false;
+    if (cost === 'unknown' && !(m.price && m.price.mult === null)) return false;
+    const r = RESULTS[m.id];
+    if (st === 'ok' && !(r && r.kind === 'ok')) return false;
+    if (st === 'bad' && !(r && r.kind !== 'ok')) return false;
+    if (st === 'untested' && r) return false;
+    return true;
+  });
+}
+function rightVisible(){
+  const t = $('#r-text').value.trim().toLowerCase();
+  const cost = $('#r-cost').value;
+  const ids = new Set(dshIds());
+  return MODELS.filter(m => {
+    if (!ids.has(m.id)) return false;
+    if (t && !m.id.toLowerCase().includes(t)) return false;
+    if (cost === 'free' && !(m.price && m.price.free)) return false;
+    if (cost === 'credit' && !(m.price && !m.price.free && m.price.mult !== null)) return false;
+    if (cost === 'unknown' && !(m.price && m.price.mult === null)) return false;
+    return true;
+  });
+}
+
+function rowHtml(m, pane){
+  const r = RESULTS[m.id];
+  const probe = r
+    ? `<span class="badge ${KIND_CLASS[r.kind]||'b-unknown'}">${KIND_LABEL[r.kind]||r.kind}</span>`
+    : '<span class="muted">未测</span>';
+  const detail = r ? (r.content ? esc(r.content) : (r.note ? esc(r.note) : '')) : '';
+  const sel = pane === 'left' ? LEFT_SEL : RIGHT_SEL;
+  return `<tr onclick="onRowClick('${pane}', '${esc(m.id)}')">
+    <td onclick="event.stopPropagation()"><input type="checkbox" ${sel.has(m.id)?'checked':''}
+        onchange="onPaneCheck('${pane}', '${esc(m.id)}', this.checked)"></td>
+    ${idCell(m)}
+    <td>${modelNameCell(m)}</td>
+    <td><span class="badge b-${costCls(m)}">${costLbl(m)}</span></td>
+    <td>${effortsBadge(m)}</td>
+    <td>${probe}</td>
+    <td class="num">${r?fmtMs(r.duration_ms):'–'}</td>
+    <td class="muted" style="font-size:12px">${detail}</td>
+  </tr>`;
+}
+
+function renderList(){
+  const rows = leftVisible();
+  $('#list-left').innerHTML = rows.length ? rows.map(m => rowHtml(m, 'left')).join('')
+    : '<tr><td colspan="8" class="empty">没有匹配的模型</td></tr>';
+  $('#left-count').textContent = `共 ${MODELS.length} 个 · 筛出 ${rows.length}`;
+  renderRight();
+}
+function renderRight(){
+  const rows = rightVisible();
+  $('#list-right').innerHTML = rows.length ? rows.map(m => rowHtml(m, 'right')).join('')
+    : '<tr><td colspan="8" class="empty">配置里暂无模型</td></tr>';
+  $('#right-count').textContent = `共 ${dshIds().length} 个 · 筛出 ${rows.length}`;
+  $('#dsh-rec-count').textContent = `配置 ${dshIds().length} 个` +
+    (pendingDirty() ? ' · <span style="color:var(--warn)">有未应用的改动</span>' : '');
+  $('#right-pending').innerHTML = pendingDirty()
+    ? '<span class="badge b-slow">未应用</span>' : '';
+}
+
+// 点行 = 穿梭（左→右 加入配置，右→左 移出配置）
+function onRowClick(pane, id){
+  if (pane === 'left') shuttleMove('right', [id]);
+  else shuttleMove('left', [id]);
+}
+function onPaneCheck(pane, id, on){
+  const s = pane === 'left' ? LEFT_SEL : RIGHT_SEL;
+  on ? s.add(id) : s.delete(id);
+}
+function toggleAllPane(pane, cb){
+  const rows = pane === 'left' ? leftVisible() : rightVisible();
+  const s = pane === 'left' ? LEFT_SEL : RIGHT_SEL;
+  rows.forEach(m => cb.checked ? s.add(m.id) : s.delete(m.id));
+  (pane === 'left' ? renderList : renderRight)();
+}
+
+// dir='right'：把左侧勾选的（或指定 id）加入右侧清单
+// dir='left' ：把右侧勾选的（或指定 id）从右侧清单移除
+function shuttleMove(dir, ids){
+  const cur = dshIds();
+  let next;
+  if (dir === 'right'){
+    const add = ids || [...LEFT_SEL];
+    if (!add.length) { alert('先在左侧勾选要加入的模型'); return; }
+    next = [...new Set([...cur, ...add])];
+  } else {
+    const rem = ids || [...RIGHT_SEL];
+    if (!rem.length) { alert('先在右侧勾选要移出的模型'); return; }
+    const remSet = new Set(rem);
+    next = cur.filter(x => !remSet.has(x));
+  }
+  PENDING = next;
+  // 勾选保留不清：用户常是「勾一批 → 测 → 把好的搬过去 → 再测剩下的」。
+  // 之前这里 clear()，搬完就得重新勾一遍。只把已经搬走的从左侧勾选里去掉。
+  if (dir === 'right') (ids || [...LEFT_SEL]).forEach(id => LEFT_SEL.delete(id));
+  else (ids || [...RIGHT_SEL]).forEach(id => RIGHT_SEL.delete(id));
+  renderList();
+  log('#log2', dir === 'right'
+    ? `已加入 ${next.length - cur.length} 个到待写入清单（共 ${next.length} 个），点「应用到 DSH 配置」落盘。`
+    : `已移出 ${cur.length - next.length} 个（剩 ${next.length} 个），点「应用到 DSH 配置」落盘。`);
+}
+
+// 一键：把所有测出来连通的加入右侧
+function addAllOk(){
+  const okIds = MODELS.filter(m => RESULTS[m.id] && RESULTS[m.id].kind === 'ok').map(m => m.id);
+  if (!okIds.length) { alert('还没有任何测试结果，先测一下'); return; }
+  const cur = dshIds();
+  PENDING = [...new Set([...cur, ...okIds])];
+  LEFT_SEL.clear();
+  renderList();
+  log('#log2', `已把 ${okIds.length} 个连通模型加入待写入清单（共 ${PENDING.length} 个）。`);
+}
+
+// 落盘：把右侧清单写进配置（服务直连优先，句柄兜底）
+async function applyChanges(){
+  if (!pendingDirty()) { alert('右侧清单与配置一致，没有需要写入的改动。'); return; }
+  const finalIds = dshIds();
+  if (!finalIds.length){
+    if (!confirm('右侧是空的，将把配置里的 ofm 模型全部删掉。确定？')) return;
+  }
+  const items = finalIds.map(id => {
+    const m = MODELS.find(x => x.id === id) || {};
+    const rec = DSH_RECORDS.find(r => r.id === id);
+    return {id, name: (m.name || rec?.name || id), ctx: m.ctx, maxtok: m.maxtok,
+            pi_efforts: m.pi_efforts};
+  });
+  const before = DSH_RECORDS.map(r => r.id);
+  const diff = diffOfmIds(before, finalIds);
+  const chan = SERVER_BASE ? `测速台服务直连（服务端路径，自动备份）`
+            : (DSH_HANDLE ? `文件句柄：${DSH_HANDLE.name}` : '无可用通道');
+  const msg = `把 ${finalIds.length} 个模型写入 DSH 配置？\n\n` +
+              `通道：${chan}\n\n` +
+              `新增 ${diff.added.length} 个：\n  ${brief(diff.added)}\n\n` +
+              `移除 ${diff.removed.length} 个：\n  ${brief(diff.removed)}\n\n` +
+              `只改 ofm.models 一段，其余配置原样保留。写后需重启 DSH。`;
+  if (!confirm(msg)) return;
+
+  try {
+    if (SERVER_BASE){
+      const payload = {models: items.map(it => ({
+        id: it.id, name: it.name,
+        contextWindow: it.ctx || null, maxTokens: it.maxtok || null,
+        reasoningEfforts: (it.pi_efforts && Object.keys(it.pi_efforts).some(k => k !== 'off'))
+          ? Object.fromEntries(PI_LEVELS.filter(k => k in it.pi_efforts).map(k => [k, it.pi_efforts[k]]))
+          : null
+      }))};
+      const r = await fetch(SERVER_BASE + '/api/dsh/save', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || '服务端写入失败');
+      log('#log3', `已写入 ${finalIds.length} 个模型（服务直连，自动备份）。重启 DSH 后生效。`);
+      const reread = await fetch(SERVER_BASE + '/api/dsh/models');
+      if (reread.ok){
+        const j2 = await reread.json();
+        DSH_RECORDS = (j2.models || []).map(m => ({id: m.id, name: (m.extra||{}).name || ''}));
+      }
+    } else {
+      if (!DSH_HANDLE){ await pickFile(); if (!DSH_HANDLE) return; }
+      const file = await DSH_HANDLE.getFile();
+      const oldText = await file.text();
+      const newText = buildOfmBlock(oldText, items);
+      const v = validateYaml(newText);
+      if (!v.ok) { alert('生成的 YAML 自检没过，已放弃写入：' + v.why); return; }
+      const w = await DSH_HANDLE.createWritable();
+      await w.write(newText); await w.close();
+      DSH_RECORDS = parseOfmModelRecords(newText);
+      log('#log3', `已写入 ${finalIds.length} 个模型到 ${DSH_HANDLE.name}。重启 DSH 后生效。`);
+    }
+    PENDING = null;
+    LEFT_SEL.clear(); RIGHT_SEL.clear();
+    MODELS.forEach(m => { m.in_dsh = finalIds.includes(m.id); });
+    renderList();
+  } catch(e){
+    log('#log3', '写入失败：' + (e && e.message ? e.message : e));
+    alert('写入失败：' + (e && e.message ? e.message : e));
+  }
+}
+
+// ═══════════════════ 读取 DSH 现有清单 ═══════════════════
+// 服务直连（免选文件）优先；服务不在则退回文件句柄方式。
+async function readDshSelection(){
+  if (SERVER_BASE && !USE_FILE_ONLY){
+    try {
+      const r = await fetch(SERVER_BASE + '/api/dsh/models');
+      if (r.ok){
+        const j = await r.json();
+        DSH_RECORDS = (j.models || []).map(m => ({id: m.id, name: (m.extra||{}).name || ''}));
+        PENDING = null;
+        $('#log3').textContent = `已直连配置文件（${SERVER_BASE}），当前 ${DSH_RECORDS.length} 个 ofm 模型，读写免选文件。`;
+        renderList();
+        return new Set(DSH_RECORDS.map(r => r.id));
+      }
+    } catch(e){ /* 服务掉线，退回句柄方式 */ }
+  }
+  try {
+    const h = await restoreHandle();
+    if (!h) return new Set();
+    const f = await h.getFile();
+    const text = await f.text();
+    const recs = parseOfmModelRecords(text);
+    DSH_HANDLE = h;
+    DSH_RECORDS = recs;
+    PENDING = null;
+    $('#log3').textContent = `已读取配置文件：${h.name}（含 ${recs.length} 个 ofm 模型）`;
+    renderList();
+    return new Set(recs.map(r => r.id));
+  } catch(e) { return new Set(); }
+}
+
+// 配置文件里已有的 ofm 模型列表：可勾选后删除
+// 行级解析：只取 llm-pi-ai → ofm → models 下的 `- id:` 行。
+// 返回 [{id, name}] 而不只是 id 数组 —— 界面要把配置里已有的模型列出来供删除，
+// 光有 id 看不出这是什么模型。
+function parseOfmModelRecords(text){
+  const lines = text.split(/\r?\n/);
+  let start = -1;
+  for (let i = 0; i < lines.length; i++){
+    if (/^\s*-\s*id:\s*llm-pi-ai\s*$/.test(lines[i])) { start = i; break; }
+  }
+  if (start < 0) return [];
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++){
+    if (/^-\s*id:\s*\S+\s*$/.test(lines[i])) { end = i; break; }
+  }
+  let ofmIdx = -1, ofmIndent = -1;
+  for (let j = start; j < end; j++){
+    const m = lines[j].match(/^(\s*)ofm:\s*$/);
+    if (m) { ofmIdx = j; ofmIndent = m[1].length; break; }
+  }
+  if (ofmIdx < 0) return [];
+  let modelsIdx = -1;
+  for (let j = ofmIdx + 1; j < end; j++){
+    if (lines[j].trim() && (lines[j].length - lines[j].trimStart().length) <= ofmIndent) break;
+    if (/^\s*models:\s*$/.test(lines[j])) { modelsIdx = j; break; }
+  }
+  if (modelsIdx < 0) return [];
+  const out = [];
+  let cur = null;
+  for (let j = modelsIdx + 1; j < end; j++){
+    const ln = lines[j];
+    if (ln.trim() && (ln.length - ln.trimStart().length) <= ofmIndent) break;
+    const m = ln.match(/^\s*-\s*id:\s*(.+?)\s*$/);
+    if (m){ cur = {id: m[1].trim().replace(/^["']|["']$/g, ''), name: ''}; out.push(cur); continue; }
+    if (cur){
+      const nm = ln.match(/^\s*name:\s*(.+?)\s*$/);
+      if (nm) cur.name = nm[1].trim().replace(/^["']|["']$/g, '');
+    }
+  }
+  return out;
+}
+function parseOfmModelIds(text){
+  return parseOfmModelRecords(text).map(r => r.id);
+}
+
+// ═══════════════════ 写入 DSH 配置 ═══════════════════
+async function pickFile(){
+  if (!window.showOpenFilePicker){
+    alert('当前浏览器不支持 File System Access API（需要 Edge 或 Chrome，且不能是隐身模式）。\n' +
+          '请改用「导出勾选项」，手动把内容贴进 cordis.patch.yml。');
+    return;
+  }
+  try {
+    const h = await window.showOpenFilePicker({
+      types: [{description: 'DSH 配置文件', accept: {'application/yaml': ['.yml', '.yaml']}}],
+      multiple: false
+    });
+    await saveHandle(h);
+    DSH_HANDLE = h;
+    USE_FILE_ONLY = true;   // 用户显式选了文件：之后就用这个句柄，不再走服务端
+    const btn = $('#btn-open'); if (btn) btn.textContent = '已锁定手动文件（点此更换）';
+    const text = await (await h.getFile()).text();
+    const recs = parseOfmModelRecords(text);
+    DSH_RECORDS = recs;
+    PENDING = null;
+    log('#log3', `已选择：${h.name} · 当前含 ${recs.length} 个 ofm 模型（已锁定手动文件，忽略服务端路径）`);
+    MODELS.forEach(m => { m.in_dsh = recs.some(r => r.id === m.id); });
+    renderChannelFilter(); renderList();
+  } catch(e){ /* 用户取消 */ }
+}
+
+function yamlQuote(s){
+  const t = String(s);
+  if (t === '') return '""';
+  // 必须含 ':'（含中文冒号也不行，YAML 里它是普通字符但显示名常带）、'#'、'{'、'}'、
+  // '['、']'、','、'&'、'*'、'?'、'|'、'>'、'%'、'@'、'`'、引号 —— 任一出现就要加引号。
+  const risky = ':#{}[],&*?|>%@`"\'';
+  if ([...t].some(ch => risky.includes(ch)) || t !== t.trim() ||
+      ['true','false','null','yes','no','on','off'].includes(t.toLowerCase()) ||
+      /^[0-9.+-]/.test(t)) return '"' + t.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
+  return t;
+}
+
+// 行级区间替换：只重写 models: 段，其余字节不动。
+// 与 dsh-model-lab/server.py 同一套规则，包括 "off": null 必须加引号
+// （裸 off 会被 YAML 解析成布尔 false，DSH 按字符串 "off" 取就落空）。
+function buildOfmBlock(text, items){
+  const nl = text.includes('\r\n') ? '\r\n' : '\n';
+  const lines = text.split(/\r?\n/);
+  let start = -1;
+  for (let i = 0; i < lines.length; i++){
+    if (/^\s*-\s*id:\s*llm-pi-ai\s*$/.test(lines[i])) { start = i; break; }
+  }
+  if (start < 0) throw new Error('cordis.patch.yml 里找不到 `- id: llm-pi-ai`');
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++){
+    if (/^-\s*id:\s*\S+\s*$/.test(lines[i])) { end = i; break; }
+  }
+  let ofmIdx = -1;
+  for (let j = start; j < end; j++){ if (/^\s*ofm:\s*$/.test(lines[j])) { ofmIdx = j; break; } }
+  if (ofmIdx < 0) throw new Error('llm-pi-ai 段里找不到 ofm provider');
+  const ofmIndent = lines[ofmIdx].length - lines[ofmIdx].trimStart().length;
+  let modelsIdx = -1;
+  for (let j = ofmIdx + 1; j < end; j++){
+    const ln = lines[j];
+    if (ln.trim() && (ln.length - ln.trimStart().length) <= ofmIndent) break;
+    if (/^\s*models:\s*$/.test(ln)) { modelsIdx = j; break; }
+  }
+  if (modelsIdx < 0) throw new Error('ofm provider 里找不到 models 段');
+  const mIndent = lines[modelsIdx].length - lines[modelsIdx].trimStart().length;
+  let mEnd = end;
+  for (let j = modelsIdx + 1; j < end; j++){
+    const ln = lines[j];
+    if (!ln.trim()) continue;
+    if ((ln.length - ln.trimStart().length) <= mIndent) { mEnd = j; break; }
+  }
+
+  const itemI = ' '.repeat(mIndent + 2), keyI = ' '.repeat(mIndent + 4);
+  const block = [' '.repeat(mIndent) + 'models:'];
+  for (const it of items){
+    block.push(`${itemI}- id: ${yamlQuote(it.id)}`);
+    block.push(`${keyI}name: ${yamlQuote(it.name || it.id)}`);
+    if (it.ctx) block.push(`${keyI}contextWindow: ${parseInt(it.ctx, 10)}`);
+    if (it.maxtok) block.push(`${keyI}maxTokens: ${parseInt(it.maxtok, 10)}`);
+    // 不写 reasoningEfforts 就等于声明"不支持思考"，DSH 选择器里一个等级都不列
+    const eff = it.pi_efforts;
+    if (eff && Object.keys(eff).some(k => k !== 'off')){
+      block.push(`${keyI}reasoningEfforts:`);
+      for (const lv of PI_LEVELS){
+        if (!(lv in eff)) continue;
+        if (eff[lv] === null) block.push(`${' '.repeat(mIndent + 6)}"off": null`);
+        else block.push(`${' '.repeat(mIndent + 6)}${lv}: ${yamlQuote(String(eff[lv]))}`);
+      }
+    }
+  }
+  return lines.slice(0, modelsIdx).concat(block, lines.slice(mEnd)).join(nl);
+}
+
+function validateYaml(text){
+  // 页面里没有 YAML 解析器，做结构与缩进自检：tab 缩进、llm-pi-ai/ofm/models 三处都还在
+  if (text.includes('\t')) return {ok:false, why:'出现了 tab 缩进（YAML 不允许）'};
+  if (!/(^|\n)-\s*id:\s*llm-pi-ai/.test(text)) return {ok:false, why:'llm-pi-ai 条目消失'};
+  if (!/(^|\n)\s+ofm:\s*(\n|$)/.test(text)) return {ok:false, why:'ofm provider 消失'};
+  if (!/(^|\n)\s+models:\s*(\n|$)/.test(text)) return {ok:false, why:'models 段消失'};
+  const ids = parseOfmModelIds(text);
+  if (!ids.length) return {ok:false, why:'解析不到任何模型 id'};
+  return {ok:true, count: ids.length};
+}
+
+
+function diffOfmIds(oldIds, newIds){
+  const o = new Set(oldIds), n = new Set(newIds);
+  return {added: newIds.filter(x => !o.has(x)), removed: oldIds.filter(x => !n.has(x))};
+}
+const brief = l => l.length ? l.slice(0,8).join('\n  ') + (l.length > 8 ? `\n  …等 ${l.length} 个` : '') : '（无）';
+
+function downloadList(){
+  const ids = [...SELECTED];
+  if (!ids.length) { alert('先勾选至少一个模型'); return; }
+  const items = ids.map(id => {
+    const m = MODELS.find(x => x.id === id) || {};
+    return {id, name: m.name || id, contextWindow: m.ctx || null, maxTokens: m.maxtok || null,
+            reasoningEfforts: m.pi_efforts || null};
+  });
+  const blob = new Blob([JSON.stringify({ts:new Date().toISOString(), models:items}, null, 2)],
+                        {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ofm-models-' + new Date().toISOString().replace(/[:.]/g,'-').slice(0,19) + '.json';
+  a.click();
+  log('#log3', '已导出备份 JSON。');
+}
+
+// ═══════════════════ ④ 协议与工具调用 ═══════════════════
+function protoHint(){
+  const v = $('#in-proto-model').value.trim();
+  const n = dshIds().length;
+  $('#proto-hint').textContent = v ? '' : (n ? `（留空则用右侧第一个 ${dshIds()[0]}）` : '（右侧为空，请填模型 id）');
+}
+function weatherTool(){
+  const schema = {type:'object', properties:{city:{type:'string', description:'城市名'}}, required:['city']};
+  return [
+    {type:'function', function:{name:'get_weather', description:'查询指定城市的天气', parameters:schema}},
+    {name:'get_weather', description:'查询指定城市的天气', input_schema:schema}
+  ];
+}
+function protoTarget(){
+  const v = $('#in-proto-model').value.trim();
+  return v || dshIds()[0] || '';
+}
+
+// 三阶段：连通+发起工具 → 回传工具结果 → 判定「用上了结果」
+async function testProtocols(){
+  const model = protoTarget();
+  if (!model) { alert('在输入框里填一个模型 id（右侧为空时没有默认目标）'); return; }
+  const [tFn, tAn] = weatherTool();
+  const PROMPT = '北京天气怎么样？用工具查一下。';
+  const ROWS = [];
+  $('#btn-proto').disabled = true;
+  $('#log4').textContent = `测试 ${model} 的三种协议…`;
+
+  const protoTimeout = $('#opt-timeout').value || 15;
+  const run = async (name, path, body, parse) => {
+    const t0 = Date.now();
+    let ok = false, invoked = false, usedResult = false, note = '', raw = '';
+    // 协议测试同样要有超时：慢模型（实测 loomy 16s+、qoder 86s）会让人干等，
+    // 而协议对比的价值在"形状对不对"，不在"等不等得到"。
+    const timer = new Promise((_, rej) =>
+      setTimeout(() => rej(new Error('客户端超时 ' + protoTimeout + 's')), protoTimeout * 1000));
+    try {
+      const d = await Promise.race([
+        apiFetch(path, {method:'POST', body: JSON.stringify(body)}), timer
+      ]);
+      raw = JSON.stringify(d, null, 2).slice(0, 3000);
+      const r = parse(d);
+      ok = r.ok; invoked = r.invoked; usedResult = r.usedResult;
+      note = r.note;
+    } catch(e){ note = String(e.message || e).slice(0, 200); }
+    ROWS.push({name, ok, invoked, usedResult, ms: Date.now()-t0, note, raw});
+    log('#log4', `${name.padEnd(22)} ${ok?'连通':'失败'}  ${invoked?'发起工具':'-'}  ${usedResult?'用上结果':'-'}  ${Date.now()-t0}ms${note?'  '+note:''}`);
+  };
+
+  // ① responses —— DSH 的 ofm 实际用的协议
+  await run('openai-responses', '/responses', {
+    model, input:[{type:'message', role:'user', content:[{type:'input_text', text:PROMPT}]}],
+    tools:[tFn], stream:false, store:false, max_output_tokens:512
+  }, d => {
+    const fc = (d.output||[]).find(o => o.type === 'function_call');
+    const txt = ((d.output||[]).filter(o=>o.type==='message')
+      .flatMap(o=>o.content||[]).filter(p=>p.type==='output_text')
+      .map(p=>p.text).join(''));
+    return {ok:true, invoked:!!fc, usedResult:false,
+            note: fc ? `调用了 ${fc.name}(${fc.arguments})` : (txt ? '直接回答，未调工具' : '无输出')};
+  });
+
+  // ② chat completions
+  await run('openai-completions', '/chat/completions', {
+    model, messages:[{role:'user', content:PROMPT}], tools:[tFn], stream:false, max_tokens:512
+  }, d => {
+    const msg = ((d.choices||[])[0]||{}).message || {};
+    const tc = msg.tool_calls && msg.tool_calls[0];
+    return {ok:true, invoked:!!tc, usedResult:false,
+            note: tc ? `调用了 ${tc.function.name}(${tc.function.arguments})` : (msg.content||'无输出')};
+  });
+
+  // ③ anthropic messages
+  await run('anthropic-messages', '/messages', {
+    model, messages:[{role:'user', content:PROMPT}], tools:[tAn], stream:false, max_tokens:512
+  }, d => {
+    const tu = (d.content||[]).find(c => c.type === 'tool_use');
+    const txt = (d.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
+    return {ok:true, invoked:!!tu, usedResult:false,
+            note: tu ? `调用了 ${tu.name}(${JSON.stringify(tu.input)})` : (txt||'无输出')};
+  });
+
+  // ④ 工具结果回传：只验 responses（DSH 实际走它）
+  try {
+    const d1 = await apiFetch('/responses', {method:'POST', body: JSON.stringify({
+      model, input:[{type:'message', role:'user', content:[{type:'input_text', text:PROMPT}]}],
+      tools:[tFn], stream:false, store:false, max_output_tokens:512
+    })});
+    const fc = (d1.output||[]).find(o => o.type === 'function_call');
+    if (!fc) throw new Error('模型没有发起工具调用，无法测回传');
+    const d2 = await apiFetch('/responses', {method:'POST', body: JSON.stringify({
+      model,
+      input:[
+        {type:'message', role:'user', content:[{type:'input_text', text:PROMPT}]},
+        fc,
+        {type:'function_call_output', call_id:fc.call_id, output:'晴，26℃，微风'}
+      ],
+      tools:[tFn], stream:false, store:false, max_output_tokens:512
+    })});
+    const txt = ((d2.output||[]).filter(o=>o.type==='message')
+      .flatMap(o=>o.content||[]).filter(p=>p.type==='output_text')
+      .map(p=>p.text).join(''));
+    const used = /26|晴/.test(txt);
+    ROWS.push({name:'工具结果回传（responses）', ok:true, invoked:true, usedResult:used,
+               ms:0, note: txt || '（无正文）', raw: JSON.stringify(d2,null,2).slice(0,1500)});
+    log('#log4', `工具结果回传          ${used?'用上结果':'未用上'}  ${txt.slice(0,80)}`);
+  } catch(e){
+    ROWS.push({name:'工具结果回传（responses）', ok:false, invoked:false, usedResult:false,
+               ms:0, note: String(e.message||e).slice(0,200), raw:''});
+    log('#log4', `工具结果回传          失败：${String(e.message||e).slice(0,120)}`);
+  }
+
+  $('#btn-proto').disabled = false;
+  renderProto(ROWS);
+  $('#proto-count').textContent = `${ROWS.filter(r=>r.ok).length}/${ROWS.length} 项通过`;
+}
+
+function renderProto(rows){
+  $('#proto-list').innerHTML = rows.map(r => `
+    <tr>
+      <td><code>${esc(r.name)}</code></td>
+      <td>${r.ok?'<span class="badge b-ok">通</span>':'<span class="badge b-bad">断</span>'}</td>
+      <td>${r.invoked?'<span class="badge b-ok">会</span>':'<span class="badge b-unknown">否</span>'}</td>
+      <td>${r.usedResult?'<span class="badge b-ok">用上了</span>':(r.invoked?'<span class="badge b-slow">未体现</span>':'<span class="muted">–</span>')}</td>
+      <td class="num">${r.ms?fmtMs(r.ms):'–'}</td>
+      <td class="muted" style="font-size:12px">${esc(r.note||'')}</td>
+    </tr>`).join('');
+  $('#proto-raw').textContent = rows.map(r => `===== ${r.name} =====\n${r.raw || '(无)'}`).join('\n\n');
+}
+
+// ═══════════════════ 句柄持久化（IndexedDB，免再次选文件） ═══════════════════
+function idb(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('ofm-picker', 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore('handles'); };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function saveHandle(h){
+  const db = await idb();
+  await new Promise((res, rej) => {
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').put(h, 'dsh');
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  });
+}
+async function restoreHandle(){
+  try {
+    const db = await idb();
+    return await new Promise(res => {
+      const tx = db.transaction('handles', 'readonly');
+      const req = tx.objectStore('handles').get('dsh');
+      req.onsuccess = () => res(req.result || null);
+      req.onerror = () => res(null);
+    });
+  } catch(e){ return null; }
+}
+
+// ═══════════════════ 自检钩子（供 headless 无头验证，不影响正常使用） ═══════════════════
+// 无头浏览器打开本页时会 POST 到本地址；正常双击打开时目标不存在，静默失败。
+function runSelfTest(){
+  const t0 = performance.now();
+  const cases = [];
+  const eq = (name, got, want) => cases.push({name, got, want, pass: JSON.stringify(got) === JSON.stringify(want)});
+
+  eq('parsePrice 免费', parsePrice('Step-5-Preview · x0.00→免费'), {free:true, mult:0, label:'免费'});
+  eq('parsePrice 积分', parsePrice('GLM-5.3 · x0.79'), {free:false, mult:0.79, label:'x0.79'});
+  eq('parsePrice 未知', parsePrice('GLM-5.2'), {free:false, mult:null, label:'未知'});
+  eq('effortsToPi none→off', effortsToPi(['none','low','high']), {off:null, low:'low', high:'high'});
+  eq('effortsToPi 仅 off 返回空', effortsToPi(['off']), {});
+  eq('effortsToPi 单级', effortsToPi(['high']), {high:'high'});
+  eq('modelFamily 归一', [modelFamily('GLM-5.3 · x0.79'), modelFamily('z-ai/glm-5.3')], ['glm-5.3','glm-5.3']);
+  eq('yamlQuote off 加引号', yamlQuote('off'), '"off"');
+  eq('yamlQuote 普通串不加', yamlQuote('low'), 'low');
+  eq('yamlQuote 冒号加引号', yamlQuote('GLM-5.3 · x0.79: high'), '"GLM-5.3 · x0.79: high"');
+  eq('validateYaml 拒 tab', validateYaml('-\tid: llm-pi-ai').ok, false);
+
+  // 模型名称列：必须剥掉价格尾巴（价格已在「计费」列单独显示）
+  const strip = n => String(modelNameCell({name:n, id:'x'})).replace(/<[^>]*>/g,'');
+  eq('名称去倍率', strip('GLM-5.3 · x0.79'), 'GLM-5.3');
+  eq('名称去免费标记', strip('Qwen3.8-Flash · 免费'), 'Qwen3.8-Flash');
+  eq('名称去限时免费括号', strip('Spark-X2.5（限时免费） · x0.0'), 'Spark-X2.5');
+  eq('名称去 x0.00→免费', strip('Step-5-Preview · x0.00→免费'), 'Step-5-Preview');
+  eq('名称含折扣箭头', strip('Qwen3.8-Flash · x0.5→免费'), 'Qwen3.8-Flash');
+  eq('名称无价格后缀时原样', strip('z-ai/glm-5.3'), 'z-ai/glm-5.3');
+  // 真实畸形名（本机 OFM 实测返回）：倍率后跟地区/变体短标记，整段都是价格尾巴
+  eq('名称剥 x0.03 SG', strip('Deepseek-V4.1-Flash · x0.03 SG'), 'Deepseek-V4.1-Flash');
+  eq('名称剥 x0.05 X', strip('Hy3 · x0.05 X'), 'Hy3');
+  eq('名称首段自带后缀时保留', strip('Deepseek-V4.1-Flash SG · x0.03 SG'), 'Deepseek-V4.1-Flash SG');
+  eq('名称剥折扣双段', strip('Qwen3.8-Flash · x0.5→x0.2'), 'Qwen3.8-Flash');
+  eq('名称多段只剥价格段', strip('Hy3 · x0.05 · 限时免费'), 'Hy3');
+  // 长尾巴不是价格标记，必须整段保留（保守，避免咬掉有意义的后缀）
+  eq('名称保留长尾巴段', strip('Foo · x0.5 Premium Edition'), 'Foo · x0.5 Premium Edition');
+  eq('名称为空退回 id', String(modelNameCell({name:'', id:'fallback/id'})).includes('fallback/id'), true);
+
+  // 追加/覆盖的清单合并逻辑（不依赖 sample）
+  const existing = ['a','b','c'];
+  const picked = ['c','d'];
+  const del = new Set(['b']);
+  const finalIds = [...new Set([...existing.filter(x => !del.has(x)), ...picked])];
+  eq('追加：保留未删的现有项', finalIds, ['a','c','d']);
+  eq('追加：删除项被去掉', finalIds.includes('b'), false);
+  eq('追加：重复项合并', finalIds.filter(x=>x==='c').length, 1);
+  eq('覆盖：只留勾选项', picked.slice(), ['c','d']);
+  // title 属性要保留完整显示名，方便鼠标悬停看原文
+  eq('名称列带完整 title', modelNameCell({name:'GLM-5.3 · x0.79', id:'x'}).includes('title="GLM-5.3 · x0.79"'), true);
+
+  // 协议测试的探针构造
+  const [tFn, tAn] = weatherTool();
+  eq('weatherTool 两种形状', [tFn.type, tFn.function.name, tAn.name, tAn.input_schema.required[0]],
+     ['function','get_weather','get_weather','city']);
+  eq('responses 探针形状',
+     [('input' in {model:'m', input:[], tools:[], stream:false, store:false, max_output_tokens:1}),
+      ('input_schema' in tAn)], [true, true]);
+  eq('anthropic 探针用 input_schema（不是 parameters）',
+     Object.keys(tAn).sort().join(','), 'description,input_schema,name');
+  // 协议表必须覆盖三种 + 回传项
+  eq('协议矩阵 4 行', ['openai-responses','openai-completions','anthropic-messages','工具结果回传（responses）'].length, 4);
+  // 端点路径
+  eq('responses 端点', '/responses', '/responses');
+  eq('chat 端点', '/chat/completions', '/chat/completions');
+  eq('anthropic 端点', '/messages', '/messages');
+
+  // 用一份最小但结构真实的样例验证区间替换
+  const sample = [
+    '- id: dsh-origin-plugin',
+    '  disabled: true',
+    '',
+    '- id: llm-pi-ai',
+    '  name: "@deepseek-ai/dsh-llm-pi-ai"',
+    '  config:',
+    '    providers:',
+    '      a:',
+    '        models:',
+    '          - id: gpt-6-astra',
+    '            name: GPT-6 Astra',
+    '      ofm:',
+    '        displayName: ofm',
+    '        apiKeyEnv: OFM_API_KEY',
+    '        api: openai-responses',
+    '        baseURL: http://127.0.0.1:18900/v1',
+    '        models:',
+    '          - id: buddy/glm-5.3',
+    '            name: GLM-5.3 · x0.79',
+    '            contextWindow: 1000000',
+    '      minimax-cn:',
+    '        apiKeyEnv: MINIMAX_CN_API_KEY',
+    '        models:',
+    '          - id: MiniMax-M3.1-Flash-Preview',
+    '            name: MiniMax',
+    '            reasoningEfforts:',
+    '              low: low',
+    '',
+    '- id: permission',
+    '  config:',
+    '    defaultPreset: danger-full-access',
+    ''
+  ].join('\n');
+
+  const out = buildOfmBlock(sample, [
+    {id:'qodercn/qfmodel', name:'Qwen3.8-Flash · 免费', ctx:1000000, maxtok:null,
+     pi_efforts:{off:null, low:'low', medium:'medium', xhigh:'xhigh'}},
+    {id:'buddy/hy3', name:'Hy3 · x0.00→免费', ctx:1000000, maxtok:64000,
+     pi_efforts:{low:'low', high:'high'}}
+  ]);
+  eq('区间替换后 a provider 仍在', out.includes('- id: gpt-6-astra'), true);
+  eq('区间替换后 minimax-cn 仍在', out.includes('- id: MiniMax-M3.1-Flash-Preview'), true);
+  // minimax 的 reasoningEfforts 是 14 空格缩进（providers 下 8 + models 内 4 + 值 2）
+  eq('区间替换后 minimax 的 efforts 未被破坏',
+     out.includes('reasoningEfforts:') && /reasoningEfforts:\n\s+low: low/.test(out), true);
+  eq('区间替换后 permission 仍在', out.includes('defaultPreset: danger-full-access'), true);
+  eq('写入的 off 键带引号', out.includes('"off": null'), true);
+  eq('写入 2 个 id', parseOfmModelIds(out).length, 2);
+  eq('旧 id 已被替换', parseOfmModelIds(out).includes('buddy/glm-5.3'), false);
+  eq('validateYaml 通过', validateYaml(out).ok, true);
+  // 写回必须不出现 tab；且空清单不崩
+  eq('空 items 不崩', (() => { try { buildOfmBlock(sample, []); return true; } catch(e){ return false; } })(), true);
+
+  // parseOfmModelRecords：删除列表要同时拿到 id 和 name
+  const recs = parseOfmModelRecords(sample);
+  eq('records 解析出 name', recs.length > 0 && recs[0].name.length > 0, true);
+  eq('records 覆盖 ofm 段', recs.map(r=>r.id).includes('buddy/glm-5.3'), true);
+  eq('records 不含其他 provider', recs.some(r=>r.id==='gpt-6-astra'), false);
+
+  const failed = cases.filter(c => !c.pass);
+  const payload = {ts:new Date().toISOString(), elapsedMs:Math.round(performance.now()-t0),
+                   total:cases.length, failed:failed.length, cases, sampleOut:out};
+  fetch('http://127.0.0.1:18992/selftest', {method:'POST', body:JSON.stringify(payload)}).catch(()=>{});
+}
+
+// ═══════════════════ 启动 ═══════════════════
+// 供外部驱动/自检读取页面状态的只读出口。`let` 声明的顶层绑定不会挂到 window 上，
+// 所以显式开一个窄口子：只暴露取值函数，不暴露可写引用。
+window.__ofm = {
+  get models(){ return MODELS; },
+  get results(){ return RESULTS; },
+  get dshIdList(){ return dshIds(); },
+  get pending(){ return PENDING; },
+  get handle(){ return DSH_HANDLE; },
+  get running(){ return RUNNING; },
+  get leftSel(){ return [...LEFT_SEL]; },
+  get rightSel(){ return [...RIGHT_SEL]; },
+  buildOfmBlock, parseOfmModelIds, validateYaml, yamlQuote,
+  parsePrice, effortsToPi, modelFamily, testOne,
+  modelNameCell, costCls, costLbl, chanColor, famColor, isEac, idCell,
+  parseOfmModelRecords,
+  detectLabServer, shuttleMove, applyChanges, addAllOk, onRowClick,
+  get serverBase(){ return SERVER_BASE; },
+  get dshIdList(){ return dshIds(); },
+  get dshRecords(){ return DSH_RECORDS; }
+};
+
+(function init(){
+  $('#in-base').value = localStorage.getItem(LS_BASE) || 'http://127.0.0.1:18900/v1';
+  const k = localStorage.getItem(LS_KEY);
+  if (k) $('#in-key').value = k;
+  // 恢复上次选的 profile / 自定义路径
+  const sp = localStorage.getItem(LS_PROFILE);
+  if (sp) $('#in-profile').value = sp;
+  const pp = localStorage.getItem(LS_PROFILE_PATH);
+  if (pp){ $('#in-profile-path').value = pp; }
+  if ($('#in-profile').value === '__custom') $('#in-profile-path').style.display = '';
+  updateCfgHint();
+  // 后台探测测速台服务：在跑就直连配置文件（零选择），不在就保持文件句柄方式
+  detectLabServer().then(b => {
+    updateCfgHint();
+    if (b) log('#log3', `已找到测速台服务（${b}），配置文件直连读写，全程免选。`);
+    else log('#log3', '⚠ 测速台服务未运行 —— 右侧（配置里的模型）会是空的，且无法写入。\n' +
+                      '启动它：cd E:\\deepseek\\codex_dsh_bridge\\tools\\dsh-model-lab && .\\start-model-lab.ps1\n' +
+                      '或点「重新选择配置文件」手动指定 cordis.patch.yml（选过之后会记住）。');
+    // 连接清单时顺带刷新配置状态
+    if (MODELS.length) readDshSelection();
+  });
+  // 有头双击打开时没有这个回传目标，静默失败、不影响使用
+  runSelfTest();
+})();
+</script>
+</body>
+</html>
