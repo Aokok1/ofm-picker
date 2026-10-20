@@ -935,8 +935,38 @@ function addAllOk(){
 }
 
 // 落盘：把右侧清单写进配置（服务直连优先，句柄兜底）
+// 写进 DSH 配置的显示名：加 [provider] 前缀。
+// OFM 里同名模型很多（Deepseek-V4.1-Flash 同时存在于 buddy / workbuddy /
+// lobsterai / loomy / trae…），DSH 下拉里光看名字分不清是谁家的。
+// 格式：`Deepseek-V4.1-Flash [buddy] · x0.11` —— 前缀在产品名后、倍率前。
+function configName(id, base){
+  const prov = String(id).split('/')[0];
+  const provTag = ` [${prov}]`;
+  // 产品名的结束位置 = 「 · 倍率」或「（中文括号尾巴」中更靠前的那一个。
+  // 例：`Spark-X2.5（限时免费） · x0.0` → 产品名是 `Spark-X2.5`，
+  //     括号和倍率都是尾巴，前缀必须插在两者之前。
+  const iDot = base.indexOf('·');
+  const iPar = base.search(/[（(]/);
+  let cut;
+  if (iDot >= 0 && iPar >= 0) cut = Math.min(iDot, iPar);
+  else if (iDot >= 0) cut = iDot;
+  else if (iPar >= 0) cut = iPar;
+  else return base + provTag;   // 没有任何尾巴，直接追加
+  // 括号紧贴前缀（中文排版不留空格），「 · 倍率」前保留一个空格
+  const tail = base.slice(cut).trim();
+  const glue = tail.startsWith('（') || tail.startsWith('(') ? '' : ' ';
+  return base.slice(0, cut).trim() + provTag + glue + tail;
+}
+
 async function applyChanges(){
-  if (!pendingDirty()) { alert('右侧清单与配置一致，没有需要写入的改动。'); return; }
+  // 无改动：页内提示（alert 在某些环境下被静默/被误关，用户会以为按钮坏了）
+  if (!pendingDirty()) {
+    log('#log3', 'ℹ 右侧清单与配置一致，没有需要写入的改动。先在左右两侧增删模型，或测完点「把所有连通的加入配置」。');
+    const btn = $('#btn-apply'); if (btn){ btn.animate(
+      [{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],
+      {duration:220}); }
+    return;
+  }
   const finalIds = dshIds();
   if (!finalIds.length){
     if (!confirm('右侧是空的，将把配置里的 ofm 模型全部删掉。确定？')) return;
