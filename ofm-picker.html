@@ -84,6 +84,10 @@
   .pane .wrap{max-height:520px;border-top:0}
   .pane tbody tr{cursor:pointer}
   .pane tbody tr:hover{background:#eef4ff}
+  /* 单条测试按钮：小巧、不抢戏，但要好点 */
+  .btn-one{padding:2px 9px;font-size:11.5px;font-weight:600;border-radius:5px;
+    border:1px solid #cfe0fb;background:#eef4ff;color:#1b4f9c}
+  .btn-one:hover{background:#dbe8fd;border-color:#9fc3f5}
 
   /* ── 视觉编码：渠道角标 / 模型族色条 / EAC 标记 ── */
   .cell-id{position:relative;padding-left:6px !important;padding-top:6px !important;padding-bottom:9px !important}
@@ -217,9 +221,9 @@
             <thead><tr>
               <th class="tr-sel"><input type="checkbox" id="sel-all-left" onclick="toggleAllPane('left', this)"></th>
               <th>模型 id</th><th>名称</th><th>计费</th><th>思考</th>
-              <th>测试</th><th class="num">耗时</th><th>备注</th>
+              <th>测试</th><th>结果</th><th class="num">耗时</th><th>备注</th>
             </tr></thead>
-            <tbody id="list-left"><tr><td colspan="8" class="empty">连接后这里会出现模型清单</td></tr></tbody>
+            <tbody id="list-left"><tr><td colspan="9" class="empty">连接后这里会出现模型清单</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -246,9 +250,9 @@
             <thead><tr>
               <th class="tr-sel"><input type="checkbox" id="sel-all-right" onclick="toggleAllPane('right', this)"></th>
               <th>模型 id</th><th>名称</th><th>计费</th><th>思考</th>
-              <th>测试</th><th class="num">耗时</th><th>备注</th>
+              <th>测试</th><th>结果</th><th class="num">耗时</th><th>备注</th>
             </tr></thead>
-            <tbody id="list-right"><tr><td colspan="8" class="empty">读取中…</td></tr></tbody>
+            <tbody id="list-right"><tr><td colspan="9" class="empty">读取中…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -801,11 +805,16 @@ function rightVisible(){
 
 function rowHtml(m, pane){
   const r = RESULTS[m.id];
+  const busy = SINGLE_BUSY.has(m.id);
   const probe = r
     ? `<span class="badge ${KIND_CLASS[r.kind]||'b-unknown'}">${KIND_LABEL[r.kind]||r.kind}</span>`
     : '<span class="muted">未测</span>';
   const detail = r ? (r.content ? esc(r.content) : (r.note ? esc(r.note) : '')) : '';
   const sel = pane === 'left' ? LEFT_SEL : RIGHT_SEL;
+  const btn = busy
+    ? '<span class="badge b-slow">测式中…</span>'
+    : `<button class="mini btn-one" onclick="event.stopPropagation(); testOneRow('${esc(m.id)}')"
+         title="只测这一个模型（${$('#opt-deep').checked ? '深度' : '标准'}，${$('#opt-timeout').value || 15}s 超时）">测试</button>`;
   return `<tr onclick="onRowClick('${pane}', '${esc(m.id)}')">
     <td onclick="event.stopPropagation()"><input type="checkbox" ${sel.has(m.id)?'checked':''}
         onchange="onPaneCheck('${pane}', '${esc(m.id)}', this.checked)"></td>
@@ -813,23 +822,48 @@ function rowHtml(m, pane){
     <td>${modelNameCell(m)}</td>
     <td><span class="badge b-${costCls(m)}">${costLbl(m)}</span></td>
     <td>${effortsBadge(m)}</td>
+    <td>${btn}</td>
     <td>${probe}</td>
     <td class="num">${r?fmtMs(r.duration_ms):'–'}</td>
     <td class="muted" style="font-size:12px">${detail}</td>
   </tr>`;
 }
 
+// 单条测试：与批量测试同一套 testOne()，但只跑一个，且互不阻塞批量任务。
+// SINGLE_BUSY 记录正在测的 id，用来把按钮变成「测式中…」。
+const SINGLE_BUSY = new Set();
+async function testOneRow(id){
+  if (SINGLE_BUSY.has(id)) return;
+  if (!id){ return; }
+  SINGLE_BUSY.add(id);
+  renderList();
+  const deep = $('#opt-deep').checked, tmo = $('#opt-timeout').value || 15;
+  log('#log2', `[单测] ${id} 开始（${deep?'深度':'标准'}，${tmo}s）…`);
+  try {
+    const r = await testOne(id, deep, tmo, ABORT ? ABORT.signal : null);
+    RESULTS[id] = r;
+    const lbl = KIND_LABEL[r.kind] || r.kind;
+    log('#log2', `[单测] ${id}  ${lbl}  ${fmtMs(r.duration_ms)}` +
+               (r.kind !== 'ok' && r.note ? `\n     └─ ${r.note}` : ''));
+  } catch(e){
+    log('#log2', `[单测] ${id}  异常：${e && e.message ? e.message : e}`);
+  } finally {
+    SINGLE_BUSY.delete(id);
+    renderList();
+  }
+}
+
 function renderList(){
   const rows = leftVisible();
   $('#list-left').innerHTML = rows.length ? rows.map(m => rowHtml(m, 'left')).join('')
-    : '<tr><td colspan="8" class="empty">没有匹配的模型</td></tr>';
+    : '<tr><td colspan="9" class="empty">没有匹配的模型</td></tr>';
   $('#left-count').textContent = `共 ${MODELS.length} 个 · 筛出 ${rows.length}`;
   renderRight();
 }
 function renderRight(){
   const rows = rightVisible();
   $('#list-right').innerHTML = rows.length ? rows.map(m => rowHtml(m, 'right')).join('')
-    : '<tr><td colspan="8" class="empty">配置里暂无模型</td></tr>';
+    : '<tr><td colspan="9" class="empty">配置里暂无模型</td></tr>';
   $('#right-count').textContent = `共 ${dshIds().length} 个 · 筛出 ${rows.length}`;
   $('#dsh-rec-count').textContent = `配置 ${dshIds().length} 个` +
     (pendingDirty() ? ' · <span style="color:var(--warn)">有未应用的改动</span>' : '');
@@ -1467,7 +1501,7 @@ window.__ofm = {
   parsePrice, effortsToPi, modelFamily, testOne,
   modelNameCell, costCls, costLbl, chanColor, famColor, isEac, idCell,
   parseOfmModelRecords,
-  detectLabServer, shuttleMove, applyChanges, addAllOk, onRowClick,
+  detectLabServer, shuttleMove, applyChanges, addAllOk, onRowClick, testOneRow,
   get serverBase(){ return SERVER_BASE; },
   get dshIdList(){ return dshIds(); },
   get dshRecords(){ return DSH_RECORDS; }
