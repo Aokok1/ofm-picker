@@ -316,10 +316,10 @@ const LS_KEY = 'ofm-picker-key', LS_BASE = 'ofm-picker-base';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmtMs = v => (v === null || v === undefined || isNaN(v)) ? '–' : Number(v).toLocaleString() + ' ms';
-const KIND_LABEL = {ok:'连通', reason_only:'仅思考', timeout:'超时', empty:'空响应',
+const KIND_LABEL = {ok:'连通', reason_only:'仅思考', timeout:'超时', empty:'空响应', aborted:'已取消',
   cred_expired:'凭证失效', account_tier:'账号类型', eol:'已下线',
   region:'地区受限', throttled:'限流', error:'失败'};
-const KIND_CLASS = {ok:'b-ok', reason_only:'b-slow', timeout:'b-bad', empty:'b-bad',
+const KIND_CLASS = {ok:'b-ok', reason_only:'b-slow', timeout:'b-bad', empty:'b-bad', aborted:'b-unknown',
   cred_expired:'b-bad', account_tier:'b-bad', eol:'b-bad',
   region:'b-bad', throttled:'b-slow', error:'b-bad'};
 const PI_LEVELS = ['off','minimal','low','medium','high','xhigh','max'];
@@ -647,6 +647,8 @@ function classify(r){
   if (r.status === 'ok') return 'ok';
   if (r.status === 'reason_only') return 'reason_only';
   if (r.status === 'timeout') return 'timeout';
+  // 用户点「停止」取消的，单列一类 —— 和真失败分开，避免误读成模型问题
+  if (r.status === 'aborted' || /aborted?/i.test(n)) return 'aborted';
   if (/refresh/i.test(n) || (n.includes('失效') && /token/i.test(low))) return 'cred_expired';
   if (low.includes('not allowed for user type')) return 'account_tier';
   if (/end of life|no longer available/.test(low)) return 'eol';
@@ -703,6 +705,7 @@ function sweep(scope){
 function stopSweep(){ if (ABORT) ABORT.abort(); finish(); }
 function finish(){
   RUNNING = false;
+  ABORT = null;   // 批量结束就清掉：留着的话 signal.aborted 会在后续单测里继续生效
   ['btn-sweep-all','btn-sweep-free','btn-sweep-dsh','btn-sweep-leftsel','btn-sweep-rightsel']
     .forEach(i => { const el=$('#'+i); if(el) el.disabled = false; });
   $('#btn-stop').disabled = true;
@@ -832,15 +835,21 @@ function rowHtml(m, pane){
 // 单条测试：与批量测试同一套 testOne()，但只跑一个，且互不阻塞批量任务。
 // SINGLE_BUSY 记录正在测的 id，用来把按钮变成「测式中…」。
 const SINGLE_BUSY = new Set();
+const SINGLE_ABORTS = new Map();   // id -> AbortController，单测各自的开关
 async function testOneRow(id){
   if (SINGLE_BUSY.has(id)) return;
   if (!id){ return; }
   SINGLE_BUSY.add(id);
+  // ⚠ 不能复用批量的 ABORT：它是上一批的控制器，「停止」之后 signal.aborted
+  // 恒为 true，带着它 fetch 会立刻拒绝 —— 这就是「点了停止之后单测全 aborted」的原因。
+  // 单测自己造独立控制器，与批量互不牵连。
+  const ac = new AbortController();
+  SINGLE_ABORTS.set(id, ac);
   renderList();
   const deep = $('#opt-deep').checked, tmo = $('#opt-timeout').value || 15;
   log('#log2', `[单测] ${id} 开始（${deep?'深度':'标准'}，${tmo}s）…`);
   try {
-    const r = await testOne(id, deep, tmo, ABORT ? ABORT.signal : null);
+    const r = await testOne(id, deep, tmo, ac.signal);
     RESULTS[id] = r;
     const lbl = KIND_LABEL[r.kind] || r.kind;
     log('#log2', `[单测] ${id}  ${lbl}  ${fmtMs(r.duration_ms)}` +
@@ -849,6 +858,7 @@ async function testOneRow(id){
     log('#log2', `[单测] ${id}  异常：${e && e.message ? e.message : e}`);
   } finally {
     SINGLE_BUSY.delete(id);
+    SINGLE_ABORTS.delete(id);
     renderList();
   }
 }
@@ -934,7 +944,7 @@ async function applyChanges(){
   const items = finalIds.map(id => {
     const m = MODELS.find(x => x.id === id) || {};
     const rec = DSH_RECORDS.find(r => r.id === id);
-    return {id, name: (m.name || rec?.name || id), ctx: m.ctx, maxtok: m.maxtok,
+    return {id, name: configName(id, m.name || rec?.name || id), ctx: m.ctx, maxtok: m.maxtok,
             pi_efforts: m.pi_efforts};
   });
   const before = DSH_RECORDS.map(r => r.id);
